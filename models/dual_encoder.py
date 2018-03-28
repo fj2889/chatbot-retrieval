@@ -33,7 +33,7 @@ def dual_encoder_model(
   embeddings_W = get_embeddings(hparams)
 
   # Embed the context and the utterance
-  context_embedded = tf.nn.embedding_lookup(
+  context_embedded = tf.nn.embedding_lookup(         #三维？
       embeddings_W, context, name="embed_context")
   utterance_embedded = tf.nn.embedding_lookup(
       embeddings_W, utterance, name="embed_utterance")
@@ -45,16 +45,16 @@ def dual_encoder_model(
     cell = tf.nn.rnn_cell.LSTMCell(
         hparams.rnn_dim,
         forget_bias=2.0,
-        use_peepholes=True,
+        use_peepholes=True,               #让 门层 也会接受细胞状态的输入
         state_is_tuple=True)
 
     # Run the utterance and context through the RNN
     rnn_outputs, rnn_states = tf.nn.dynamic_rnn(
         cell,
-        tf.concat(0, [context_embedded, utterance_embedded]),
-        sequence_length=tf.concat(0, [context_len, utterance_len]),
+        tf.concat([context_embedded, utterance_embedded], 0),
+        sequence_length=tf.concat([context_len, utterance_len], 0),             #指定长度就不需要padding了
         dtype=tf.float32)
-    encoding_context, encoding_utterance = tf.split(0, 2, rnn_states.h)
+    encoding_context, encoding_utterance = tf.split(rnn_states.h, 2, 0)    #???
 
   with tf.variable_scope("prediction") as vs:
     M = tf.get_variable("M",
@@ -63,13 +63,13 @@ def dual_encoder_model(
 
     # "Predict" a  response: c * M
     generated_response = tf.matmul(encoding_context, M)
-    generated_response = tf.expand_dims(generated_response, 2)
+    generated_response = tf.expand_dims(generated_response, 2)          #增加了第三个维度？？
     encoding_utterance = tf.expand_dims(encoding_utterance, 2)
 
     # Dot product between generated response and actual response
     # (c * M) * r
-    logits = tf.batch_matmul(generated_response, encoding_utterance, True)
-    logits = tf.squeeze(logits, [2])
+    logits = tf.matmul(generated_response, encoding_utterance, True)             #维度匹配
+    logits = tf.squeeze(logits, [2])                               #删除第三个维度?
 
     # Apply sigmoid to convert logits to probabilities
     probs = tf.sigmoid(logits)
@@ -78,7 +78,7 @@ def dual_encoder_model(
       return probs, None
 
     # Calculate the binary cross-entropy loss
-    losses = tf.nn.sigmoid_cross_entropy_with_logits(logits, tf.to_float(targets))
+    losses = tf.nn.sigmoid_cross_entropy_with_logits(logits=logits, labels=tf.to_float(targets))
 
   # Mean loss across the batch of examples
   mean_loss = tf.reduce_mean(losses, name="mean_loss")

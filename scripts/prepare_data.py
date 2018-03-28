@@ -174,7 +174,7 @@ if __name__ == "__main__":
   create_tfrecords_file(
       input_filename=TEST_PATH,
       output_filename=os.path.join(FLAGS.output_dir, "test.tfrecords"),
-      example_fn=functools.partial(create_example_test, vocab=vocab))
+      example_fn=functools.partial(create_example_test, vocab=vocab))   #固定函数变量
 
   # Create train.tfrecords
   create_tfrecords_file(
